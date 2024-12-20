@@ -335,6 +335,7 @@ public:
 	}
 
 	double forward(double* input) {
+#pragma omp parallel for
 		for (int i = 0; i < h1_size; i++) {
 			h1_out[i] = 0;
 			if (i < h2_size) {
@@ -343,13 +344,14 @@ public:
 				h3_out[i] = 0;
 			}
 		}
-
+#pragma omp parallel for
 		for (int i = 0; i < h1_size; ++i) {
 			for (int j = 0; j < input_size; ++j) {
 				h1_out[i] += hidden1[i][j] * input[j];
 			}
 			h1_out[i] = relu(h1_out[i]);
 		}
+#pragma omp parallel for
 		for (int i = 0; i < h2_size; ++i) {
 			for (int j = 0; j < h1_size; ++j) {
 				h2_out[i] += hidden2[i][j] * h1_out[j];
@@ -398,7 +400,6 @@ public:
 				clog << "\033[2m Grads zeroed\n";
 				for (int i = batch_start; i < batch_end; ++i) {
 					char chose = 'g';
-
 					if (!(i % 150)) cout << "\033[1m\n" << (float)i / batch_end * 100 << "%\n";
 					while (_kbhit()) chose = _getch();;
 					if (chose == 'p' || chose == 'P') {
@@ -595,23 +596,39 @@ public:
 				data_gen(data);
 				clog << "\033[31m New dataset generated\n";
 			}
-			lr *= 0.9999;
+			if (lr > 1.2) lr *= 0.999;
+			else lr *= 0.9999;
 		}
 	}
 };
 
 
-
 int main(int argc, char* argv[]) {
 	current_file = executable / argv[0];
-	omp_set_num_threads(thread::hardware_concurrency() / 1.8);
 	double** data = new double* [20000];
 	for (int i = 0; i < 20000; i++) {
 		data[i] = new double[5];
 	}
+	cout << "Load? Y/N\n";
+	char ch;
+	int m = 1;
+	cin >> ch;
+	if (ch == 'y' || ch == 'Y') {
+		int m = 0;
+	}
+	else {
+		m = 1;
+	}
 	data_gen(data);
-	NeuralMLP ps(0, 4, hhh1, hhh2, hhh3, 1);
-	ps.train(data, 0.000155, 10000, 20000);
+	cout << "How much threads to use? (0 - auto)\n";
+	int th;
+	cin >> th;
+	if(th) omp_set_num_threads(th);
+	else omp_set_num_threads(thread::hardware_concurrency() / 1.8);
+	NeuralMLP ps(m, 4, hhh1, hhh2, hhh3, 1);
+	cout << "Train model before usage? \033[31m\nWrite a number of epochs. 0 if no training.\033[0m\n";
+	cin >> th;
+	ps.train(data, 0.000155, th, 20000);
 	double x[4] = { 1, 2, 3, 4 };
 	cout << ps.forward(x);
 	double ndata[4] = {};
