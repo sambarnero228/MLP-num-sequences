@@ -636,7 +636,7 @@ int main(int argc, char* argv[]) {
 		cout << "Enter nums\n";
 		for (int i = 0; i < 4; i++) {
 			cin >> ndata[i];
-			ndata[i] = log(ndata[i]);
+			ndata[i] = log10(ndata[i]);
 		}
 		if (ndata[0] == -2.65536) break;
 		cout << "\nResult: " << pow(10, ps.forward(ndata)) << "\n";
