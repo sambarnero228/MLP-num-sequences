@@ -11,26 +11,6 @@
 #include<thread>
 using namespace std;
 
-std::filesystem::path GEP() {
-#ifdef __linux__
-	char buffer[PATH_MAX];
-	ssize_t len = ::readlink("/proc/self/exe", buffer, sizeof(buffer) - 1);
-	buffer[len] = '\0';
-	return std::filesystem::canonical(std::filesystem::path(buffer)).parent_path();
-#elif defined(_WIN32)
-	wchar_t buffer[MAX_PATH];
-	DWORD len = GetModuleFileNameW(nullptr, buffer, MAX_PATH);
-	return std::filesystem::canonical(std::filesystem::path(buffer)).parent_path();
-#elif defined(__APPLE__)
-	char path[PATH_MAX];
-	uint32_t size = sizeof(path);
-	char resolved_path[PATH_MAX];
-	return std::filesystem::canonical(std::filesystem::path(resolved_path)).parent_path();
-#else
-	return std::filesystem::path();
-#endif
-}
-
 random_device rd;
 mt19937 gen(rd());
 uniform_real_distribution<> ins(0, 50);
@@ -115,7 +95,7 @@ double** data_gen(double** data) {
 			data[i][0] = ins(gen);
 			double fd = ins(gen);
 			for (int j = 1; j < 5; j++) {
-				data[i][j] = data[i][j - 1] / (fd+0.01);
+				data[i][j] = data[i][j - 1] / (fd + 0.01);
 			}
 			break;
 		}
@@ -188,7 +168,7 @@ double** data_gen(double** data) {
 			data[i][1] = ins(gen);
 			double fd = ins(gen);
 			for (int j = 2; j < 5; j++) {
-				data[i][j] = data[i][j - 2] / (fd+0.01);
+				data[i][j] = data[i][j - 2] / (fd + 0.01);
 			}
 			break;
 		}
@@ -251,7 +231,6 @@ private:
 	int h2_size;
 	int h3_size;
 	int output_size;
-	filesystem::path file_weightspath;
 	double minloss;
 public:
 	NeuralMLP(bool mode, int in_size, int h1, int h2, int h3, int out_size) : input_size(in_size), h1_size(h1), h2_size(h2), h3_size(h3), output_size(out_size) {
@@ -263,10 +242,9 @@ public:
 		hidden3 = new double* [h3_size];
 		for (int i = 0; i < h3_size; ++i) hidden3[i] = new double[h2_size];
 		output_weights = new double[h3_size];
-		file_weightspath = (GEP() / "weights.bin").generic_string();
 		minloss = 999999;
 
-		if (mode){
+		if (mode) {
 			auto init_weights = [](double** weights, int rows, int cols, int fan_in) {
 				double stddev = sqrt(2.0 / fan_in);
 				normal_distribution<double> dist(0.0, stddev);
@@ -301,58 +279,58 @@ public:
 		delete[] output_weights;
 	}
 
-	double save_model() {
-		std::ofstream file("weights.bin", ios::out | ios::binary);
-		if (!file.is_open()) {
+	void save_model() {
+		std::ofstream ofile("weights.bin", ios::out | ios::binary);
+		if (!ofile.is_open()) {
 			std::cerr << "Can't open file " << std::endl;
 			return;
 		}
 		for (int i = 0; i < 1536; ++i) {
-			file.write(reinterpret_cast<char*>(hidden1[i]), 4 * sizeof(double));
+			ofile.write(reinterpret_cast<char*>(hidden1[i]), 4 * sizeof(double));
 		}
 		for (int i = 0; i < 768; ++i) {
-			file.write(reinterpret_cast<char*>(hidden2[i]), h1_size * sizeof(double));
+			ofile.write(reinterpret_cast<char*>(hidden2[i]), h1_size * sizeof(double));
 		}
 		for (int i = 0; i < 384; ++i) {
-			file.write(reinterpret_cast<char*>(hidden3[i]), h2_size * sizeof(double));
+			ofile.write(reinterpret_cast<char*>(hidden3[i]), h2_size * sizeof(double));
 		}
-		file.write(reinterpret_cast<char*>(output_weights), h3_size * sizeof(double));
-		file.close();
-		std::ofstream file("minloss.bin", ios::out | ios::binary);
-		file.write(reinterpret_cast<char*>(&minloss), sizeof(double));
-		file.close();
+		ofile.write(reinterpret_cast<char*>(output_weights), h3_size * sizeof(double));
+		ofile.close();
+		std::ofstream onfile("minloss.bin", ios::out | ios::binary);
+		onfile.write(reinterpret_cast<char*>(&minloss), sizeof(double));
+		onfile.close();
 	}
 
 	void load_model() {
-		std::ifstream file("weights.bin", ios::in | ios::binary);
-		if (!file.is_open()) {
+		std::ifstream ifile("weights.bin", ios::in | ios::binary);
+		if (!ifile.is_open()) {
 			throw::out_of_range("No save found.");
 			return;
 		}
 		for (int i = 0; i < 1536; ++i) {
-			file.read(reinterpret_cast<char*>(hidden1[i]), 4 * sizeof(double));
-		} 
+			ifile.read(reinterpret_cast<char*>(hidden1[i]), 4 * sizeof(double));
+		}
 		for (int i = 0; i < 768; ++i) {
-			file.read(reinterpret_cast<char*>(hidden2[i]), h1_size * sizeof(double));
+			ifile.read(reinterpret_cast<char*>(hidden2[i]), h1_size * sizeof(double));
 		}
 		for (int i = 0; i < 384; ++i) {
-			file.read(reinterpret_cast<char*>(hidden3[i]), h2_size * sizeof(double));
+			ifile.read(reinterpret_cast<char*>(hidden3[i]), h2_size * sizeof(double));
 		}
-		file.read(reinterpret_cast<char*>(output_weights), h3_size * sizeof(double));
-		file.close();
-		ifstream file("minloss.bin", ios::in | ios::binary);
-		if (!file.is_open()) {
+		ifile.read(reinterpret_cast<char*>(output_weights), h3_size * sizeof(double));
+		ifile.close();
+		ifstream infile("minloss.bin", ios::in | ios::binary);
+		if (!ifile.is_open()) {
 			cout << "No minimal error file found. Creating new...";
-			file.close();
-			ofstream file("minloss.bin", ios::out | ios::binary);
+			infile.close();
+			ofstream nfile("minloss.bin", ios::out | ios::binary);
 			double x = 999999;
-			file.write(reinterpret_cast<char*>(&x), sizeof(double));
+			nfile.write(reinterpret_cast<char*>(&x), sizeof(double));
 			minloss = x;
-			file.close();
+			nfile.close();
 		}
 		else {
-			file.read(reinterpret_cast<char*>(&minloss), sizeof(double));
-			file.close();
+			infile.read(reinterpret_cast<char*>(&minloss), sizeof(double));
+			infile.close();
 		}
 	}
 
@@ -607,10 +585,10 @@ public:
 				clog << "\033[92m Weights correction success\n";
 			}
 			cout << "Epoch " << epoch << ". Loss: \033[0m" << total_error << endl;
-			if (total_error < minloss && wait<=0 ){
+			if (total_error < minloss && wait <= 0) {
 				minloss = total_error;
 				save_model();
-				wait = 1 + epoch/25;
+				wait = 1 + epoch / 25;
 			}
 			wait--;
 			if (!(epoch % 250)) {
@@ -626,7 +604,7 @@ public:
 
 int main(int argc, char* argv[]) {
 	current_file = executable / argv[0];
-	omp_set_num_threads(thread::hardware_concurrency()/1.8);
+	omp_set_num_threads(thread::hardware_concurrency() / 1.8);
 	double** data = new double* [20000];
 	for (int i = 0; i < 20000; i++) {
 		data[i] = new double[5];
